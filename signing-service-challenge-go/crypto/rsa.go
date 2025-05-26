@@ -1,15 +1,48 @@
 package crypto
 
 import (
+	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"github.com/fiskaly/coding-challenges/signing-service-challenge/domain"
 )
 
 // RSAKeyPair is a DTO that holds RSA private and public keys.
 type RSAKeyPair struct {
 	Public  *rsa.PublicKey
 	Private *rsa.PrivateKey
+}
+
+func (k *RSAKeyPair) GetPublicKey() crypto.PublicKey {
+	return k.Public
+}
+
+func (k *RSAKeyPair) GetPrivateKey() crypto.PrivateKey {
+	return k.Private
+}
+
+func (k *RSAKeyPair) GetAlgorithm() domain.Algorithm {
+	return domain.RSA
+}
+
+// RSAGenerator generates a RSA key pair.
+type RSAGenerator struct{}
+
+// Generate generates a new RSAKeyPair.
+func (g *RSAGenerator) Generate() (KeyPair, error) {
+	// Security has been ignored for the sake of simplicity.
+	key, err := rsa.GenerateKey(rand.Reader, 512)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RSAKeyPair{
+		Public:  &key.PublicKey,
+		Private: key,
+	}, nil
 }
 
 // RSAMarshaler can encode and decode an RSA key pair.
@@ -51,4 +84,21 @@ func (m *RSAMarshaler) Unmarshal(privateKeyBytes []byte) (*RSAKeyPair, error) {
 		Private: privateKey,
 		Public:  &privateKey.PublicKey,
 	}, nil
+}
+
+type RSASigner struct {
+	privateKey *rsa.PrivateKey
+}
+
+func NewRSASigner(privateKey *rsa.PrivateKey) *RSASigner {
+	return &RSASigner{
+		privateKey: privateKey,
+	}
+}
+
+func (r *RSASigner) Sign(dataToBeSigned []byte) ([]byte, error) {
+	hashedData := sha256.Sum256(dataToBeSigned)
+	signature, err := rsa.SignPKCS1v15(rand.Reader, r.privateKey, crypto.SHA256, hashedData[:])
+
+	return signature, err
 }
