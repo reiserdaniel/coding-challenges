@@ -2,11 +2,13 @@ package service
 
 import (
 	"encoding/base64"
+	"fmt"
+	"sync"
+
 	"github.com/fiskaly/coding-challenges/signing-service-challenge/crypto"
 	"github.com/fiskaly/coding-challenges/signing-service-challenge/domain"
 	"github.com/fiskaly/coding-challenges/signing-service-challenge/persistence"
 	"github.com/google/uuid"
-	"sync"
 )
 
 type DeviceService struct {
@@ -42,17 +44,17 @@ func (s *DeviceService) CreateDevice(algorithm domain.Algorithm, label string) (
 
 	keyGenerator, err := s.keyGenFactory.CreateGenerator(algorithm)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create key generator: %w", err)
 	}
 
 	keyPair, err := keyGenerator.Generate()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
 	publicKey, privateKey, err := crypto.MarshalKeyPair(keyPair)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal key pair: %w", err)
 	}
 
 	deviceRecord := &persistence.DeviceRecord{
@@ -67,7 +69,7 @@ func (s *DeviceService) CreateDevice(algorithm domain.Algorithm, label string) (
 
 	err = s.deviceRepository.CreateDevice(deviceRecord)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create device: %w", err)
 	}
 
 	return device, nil
@@ -76,7 +78,7 @@ func (s *DeviceService) CreateDevice(algorithm domain.Algorithm, label string) (
 func (s *DeviceService) GetDeviceByID(deviceId string) (*domain.Device, error) {
 	deviceRecord, err := s.deviceRepository.GetDeviceByID(deviceId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get device by id: %w", err)
 	}
 
 	return s.recordToDevice(deviceRecord), nil
@@ -109,18 +111,18 @@ func (s *DeviceService) GetAllDevices() ([]*domain.Device, error) {
 func (s *DeviceService) SignData(deviceId string, dataToBeSigned []byte) (domain.SignatureResult, error) {
 	device, err := s.deviceRepository.GetDeviceByID(deviceId)
 	if err != nil {
-		return domain.SignatureResult{}, err
+		return domain.SignatureResult{}, fmt.Errorf("failed to get device by id: %w", err)
 	}
 
 	keyMarshaller := crypto.NewRSAMarshaler()
 	keyPair, err := keyMarshaller.Unmarshal([]byte(device.PrivateKey))
 	if err != nil {
-		return domain.SignatureResult{}, err
+		return domain.SignatureResult{}, fmt.Errorf("failed to unmarshal key pair: %w", err)
 	}
 
 	signer, err := s.signerFactory.CreateSigner(keyPair)
 	if err != nil {
-		return domain.SignatureResult{}, err
+		return domain.SignatureResult{}, fmt.Errorf("failed to create signer: %w", err)
 	}
 
 	mutex := s.getDeviceMutex(deviceId)
@@ -129,7 +131,7 @@ func (s *DeviceService) SignData(deviceId string, dataToBeSigned []byte) (domain
 
 	signature, err := signer.Sign(dataToBeSigned)
 	if err != nil {
-		return domain.SignatureResult{}, err
+		return domain.SignatureResult{}, fmt.Errorf("failed to sign data: %w", err)
 	}
 
 	device.SignatureCounter++
@@ -146,7 +148,7 @@ func (s *DeviceService) SignData(deviceId string, dataToBeSigned []byte) (domain
 
 	err = s.deviceRepository.UpdateDevice(deviceRecord)
 	if err != nil {
-		return domain.SignatureResult{}, err
+		return domain.SignatureResult{}, fmt.Errorf("failed to update device: %w", err)
 	}
 
 	return domain.SignatureResult{
