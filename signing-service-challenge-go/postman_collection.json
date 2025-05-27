@@ -1,0 +1,84 @@
+{
+  "info": {
+    "name": "Signature Service API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Signature Device",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v0/devices",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v0", "devices"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"algorithm\": \"ECC\",\n    \"label\": \"Test Device\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Get All Signature Devices",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/v0/devices",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v0", "devices"]
+        }
+      }
+    },
+    {
+      "name": "Get Signature Device by ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/v0/devices/{{device_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v0", "devices", "{{device_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Sign Transaction",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v0/devices/{{device_id}}/sign",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v0", "devices", "{{device_id}}", "sign"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"data\": \"test data to sign\"\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "device_id",
+      "value": "your-device-id-here",
+      "type": "string"
+    }
+  ]
+}
