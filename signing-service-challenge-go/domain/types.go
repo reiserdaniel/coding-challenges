@@ -16,6 +16,6 @@ type Device struct {
 }
 
 type SignatureResult struct {
-	SignedData []byte `json:"signed_data"`
-	Signature  []byte `json:"signature"`
+	SignedData string `json:"signed_data"`
+	Signature  string `json:"signature"`
 }

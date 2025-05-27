@@ -35,7 +35,7 @@ type CreateSignatureDeviceRequest struct {
 }
 
 type SignTransactionRequest struct {
-	Data []byte `json:"data"`
+	Data string `json:"data"`
 }
 
 func (h *DeviceHandler) CreateSignatureDevice(response http.ResponseWriter, request *http.Request) {

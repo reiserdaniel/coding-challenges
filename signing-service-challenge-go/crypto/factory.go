@@ -39,13 +39,13 @@ func (f *SignerFactory) CreateSigner(keyPair KeyPair) (Signer, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid key pair type for RSA: %T", keyPair)
 		}
-		return NewRSASigner(rsaKeyPair.Private), nil
+		return NewRSASigner(rsaKeyPair), nil
 	case domain.ECC:
 		eccKeyPair, ok := keyPair.(*ECCKeyPair)
 		if !ok {
 			return nil, fmt.Errorf("invalid key pair type for ECC: %T", keyPair)
 		}
-		return NewECCSigner(eccKeyPair.Private), nil
+		return NewECCSigner(eccKeyPair), nil
 	default:
 		return nil, fmt.Errorf("unsupported algorithm: %s", keyPair.GetAlgorithm())
 	}

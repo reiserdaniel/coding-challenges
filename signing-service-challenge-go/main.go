@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/fiskaly/coding-challenges/signing-service-challenge/crypto"
 	"github.com/fiskaly/coding-challenges/signing-service-challenge/persistence"
 	"github.com/fiskaly/coding-challenges/signing-service-challenge/service"
 	"log"
@@ -10,12 +11,14 @@ import (
 
 const (
 	ListenAddress = ":8080"
-	// TODO: add further configuration parameters here ...
 )
 
 func main() {
-	deviceRepository := persistence.NewInMemoryDeviceRepository()
-	deviceService := service.NewDeviceService(deviceRepository)
+	deviceService := service.NewDeviceService(
+		persistence.NewInMemoryDeviceRepository(),
+		crypto.NewKeyGeneratorFactory(),
+		crypto.NewSignerFactory(),
+	)
 	deviceHandler := api.NewDeviceHandler(deviceService)
 	server := api.NewServer(ListenAddress, deviceHandler)
 

@@ -59,11 +59,14 @@ func (r *InMemoryDeviceRepository) UpdateDevice(device *DeviceRecord) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.devices[device.ID]; !exists {
+	existing, exists := r.devices[device.ID]
+	if !exists {
 		return fmt.Errorf("device with ID %s does not exist", device.ID)
 	}
-	// Store a copy to prevent external modification
-	copy := *device
-	r.devices[device.ID] = &copy
+
+	// Update the existing device with the new values
+	existing.SignatureCounter = device.SignatureCounter
+	existing.LastSignature = device.LastSignature
+
 	return nil
 }

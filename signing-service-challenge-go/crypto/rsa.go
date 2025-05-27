@@ -87,18 +87,25 @@ func (m *RSAMarshaler) Unmarshal(privateKeyBytes []byte) (*RSAKeyPair, error) {
 }
 
 type RSASigner struct {
-	privateKey *rsa.PrivateKey
+	keyPair *RSAKeyPair
 }
 
-func NewRSASigner(privateKey *rsa.PrivateKey) *RSASigner {
+func NewRSASigner(keyPair *RSAKeyPair) *RSASigner {
 	return &RSASigner{
-		privateKey: privateKey,
+		keyPair: keyPair,
 	}
 }
 
 func (r *RSASigner) Sign(dataToBeSigned []byte) ([]byte, error) {
 	hashedData := sha256.Sum256(dataToBeSigned)
-	signature, err := rsa.SignPKCS1v15(rand.Reader, r.privateKey, crypto.SHA256, hashedData[:])
+	signature, err := rsa.SignPKCS1v15(rand.Reader, r.keyPair.Private, crypto.SHA256, hashedData[:])
 
 	return signature, err
+}
+
+func (r *RSASigner) VerifySignature(dataToBeSigned []byte, signature []byte) bool {
+	hashedData := sha256.Sum256(dataToBeSigned)
+	err := rsa.VerifyPKCS1v15(r.keyPair.Public, crypto.SHA256, hashedData[:], signature)
+
+	return err == nil
 }

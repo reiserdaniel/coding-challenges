@@ -18,4 +18,5 @@ type KeyGenerator interface {
 // Signer defines a contract for different types of signing implementations.
 type Signer interface {
 	Sign(dataToBeSigned []byte) ([]byte, error)
+	VerifySignature(dataToBeSigned, signature []byte) bool
 }

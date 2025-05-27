@@ -19,11 +19,16 @@ type DeviceService struct {
 	mapMutex         sync.RWMutex
 }
 
-func NewDeviceService(deviceRepository persistence.DeviceRepository) *DeviceService {
+type DeviceWithKeys struct {
+	*domain.Device
+	KeyPair crypto.KeyPair
+}
+
+func NewDeviceService(deviceRepository persistence.DeviceRepository, keyGenFactory *crypto.KeyGeneratorFactory, signerFactory *crypto.SignerFactory) *DeviceService {
 	return &DeviceService{
 		deviceRepository: deviceRepository,
-		keyGenFactory:    crypto.NewKeyGeneratorFactory(),
-		signerFactory:    crypto.NewSignerFactory(),
+		keyGenFactory:    keyGenFactory,
+		signerFactory:    signerFactory,
 		deviceMutexes:    make(map[string]*sync.Mutex),
 		mapMutex:         sync.RWMutex{},
 	}
@@ -108,52 +113,74 @@ func (s *DeviceService) GetAllDevices() ([]*domain.Device, error) {
 	return domainDevices, nil
 }
 
-func (s *DeviceService) SignData(deviceId string, dataToBeSigned []byte) (domain.SignatureResult, error) {
-	device, err := s.deviceRepository.GetDeviceByID(deviceId)
-	if err != nil {
-		return domain.SignatureResult{}, fmt.Errorf("failed to get device by id: %w", err)
-	}
-
-	keyMarshaller := crypto.NewRSAMarshaler()
-	keyPair, err := keyMarshaller.Unmarshal([]byte(device.PrivateKey))
-	if err != nil {
-		return domain.SignatureResult{}, fmt.Errorf("failed to unmarshal key pair: %w", err)
-	}
-
-	signer, err := s.signerFactory.CreateSigner(keyPair)
-	if err != nil {
-		return domain.SignatureResult{}, fmt.Errorf("failed to create signer: %w", err)
-	}
-
+func (s *DeviceService) SignData(deviceId string, dataToBeSigned string) (*domain.SignatureResult, error) {
 	mutex := s.getDeviceMutex(deviceId)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	signature, err := signer.Sign(dataToBeSigned)
+	deviceWithKeys, err := s.getDeviceWithKeys(deviceId)
 	if err != nil {
-		return domain.SignatureResult{}, fmt.Errorf("failed to sign data: %w", err)
+		return nil, fmt.Errorf("failed to get device with keys: %w", err)
 	}
 
-	device.SignatureCounter++
-	device.LastSignature = base64.StdEncoding.EncodeToString(signature)
+	signer, err := s.signerFactory.CreateSigner(deviceWithKeys.KeyPair)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
+
+	// Format data according to specification
+	securedData := fmt.Sprintf("%d_%s_%s",
+		deviceWithKeys.SignatureCounter,
+		dataToBeSigned,
+		deviceWithKeys.LastSignature)
+
+	signature, err := signer.Sign([]byte(securedData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign data: %w", err)
+	}
+
+	encodedSignature := base64.StdEncoding.EncodeToString(signature)
+
+	deviceWithKeys.SignatureCounter++
+	deviceWithKeys.LastSignature = encodedSignature
 
 	deviceRecord := &persistence.DeviceRecord{
-		ID:               device.ID,
-		Label:            device.Label,
-		Algorithm:        device.Algorithm,
-		SignatureCounter: device.SignatureCounter,
-		LastSignature:    device.LastSignature,
-		PublicKey:        device.PublicKey,
+		ID:               deviceWithKeys.ID,
+		Label:            deviceWithKeys.Label,
+		Algorithm:        string(deviceWithKeys.Algorithm),
+		SignatureCounter: deviceWithKeys.SignatureCounter,
+		LastSignature:    deviceWithKeys.LastSignature,
 	}
 
 	err = s.deviceRepository.UpdateDevice(deviceRecord)
 	if err != nil {
-		return domain.SignatureResult{}, fmt.Errorf("failed to update device: %w", err)
+		return nil, fmt.Errorf("failed to update device: %w", err)
 	}
 
-	return domain.SignatureResult{
-		SignedData: dataToBeSigned,
-		Signature:  signature,
+	return &domain.SignatureResult{
+		SignedData: securedData,
+		Signature:  encodedSignature,
+	}, nil
+}
+
+// getDeviceWithKeys retrieves a device and reconstructs its key pair
+func (s *DeviceService) getDeviceWithKeys(deviceID string) (*DeviceWithKeys, error) {
+	deviceRecord, err := s.deviceRepository.GetDeviceByID(deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device by id: %w", err)
+	}
+
+	device := s.recordToDevice(deviceRecord)
+
+	// Reconstruct key pair
+	keyPair, err := crypto.UnmarshalKeyPair(device.Algorithm, deviceRecord.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal key pair: %w", err)
+	}
+
+	return &DeviceWithKeys{
+		Device:  device,
+		KeyPair: keyPair,
 	}, nil
 }
 
